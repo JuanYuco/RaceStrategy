@@ -16,6 +16,11 @@ namespace RaceStrategy.Application.Services
             this._strategyRepository = strategyRepository;
             this._tireService = tireService;
         }
+
+        /// <summary>
+        /// Método que retorna las estrategias sugeridas.
+        /// </summary>
+        /// <param name="request">contiene la cantidad de vueltas, el id del piloto y el nombre de la persona que genera las estrategias</param>
         public async Task<OptimalStrategyCollectionResponseDTO> GetOptimalCollection(OptimalStrategyRequestDTO request)
         {
             var result = new OptimalStrategyCollectionResponseDTO() { Successful = false };
@@ -50,6 +55,14 @@ namespace RaceStrategy.Application.Services
             return result;
         }
 
+        /// <summary>
+        /// Método que genera las combinaciones de ruedas por medio de recursividad
+        /// </summary>
+        /// <param name="maxLaps">Vueltas que llegan desde la UI</param>
+        /// <param name="lapsAmount">Contador de la vueltas, se usa para validar si no se han pasado del máximo de cantidad de vueltas</param>
+        /// <param name="tireCollection">Collección de ruedas, viene de BD</param>
+        /// <param name="combinationCollection">Lleva las combinaciones generadas por cada ciclo</param>
+        /// <param name="combinationsResult">Tiene las combinaciones generadas.</param>
         private void GenerateCombination(int maxLaps, int lapsAmount, ICollection<TireDTO> tireCollection, List<TireDTO> combinationCollection, List<List<TireDTO>> combinationsResult)
         {
             List<TireDTO> currentUsedTireCollection = new List<TireDTO>();
@@ -62,16 +75,27 @@ namespace RaceStrategy.Application.Services
                 }
 
                 var newCombinationCollection = new List<TireDTO>(combinationCollection) { tire };
+                // Como se puede superar la cantidad de vueltas y en muchas ocaciones no va a dar la cantidad exacta de vueltas, se permite una suma menor pero con un rango del 20%
                 if (currentLapsAmount > (maxLaps - (maxLaps * 0.2))){
                     combinationsResult.Add(newCombinationCollection);
                 }
 
+                // Se filtra las ruedas que ya fueron recorridas, para así evitar repetir combinaciones pero con diferente posición por ejemplo: SSM, SMS
                 var newTireCollection = tireCollection.Where(x => !currentUsedTireCollection.Contains(x)).ToList();
                 GenerateCombination(maxLaps, currentLapsAmount, newTireCollection, newCombinationCollection, combinationsResult);
+
+                // Se agrega a la lista de ruedas usadas para descartarla en el proximo ciclo de combinaciones.
                 currentUsedTireCollection.Add(tire);
             }
         }
 
+        /// <summary>
+        /// Método que guarda en BD las combinaciones generadas.
+        /// </summary>
+        /// <param name="combinationsResult">Resultado de combinaciones</param>
+        /// <param name="driverId">Id del piloto viene desde la UI</param>
+        /// <param name="createdBy">Nombre de la persona que crea la combinación</param>
+        /// <param name="maxLaps">Cantidad de vueltas.</param>
         private async Task SaveStrategies(List<List<TireDTO>> combinationsResult, int driverId, string createdBy, int maxLaps)
         {
             List<Strategy> strategyCollection = new List<Strategy>();
@@ -102,6 +126,10 @@ namespace RaceStrategy.Application.Services
             await _strategyRepository.CreateCollection(strategyCollection);
         }
 
+        /// <summary>
+        /// Método que mapea los resultados y genera una lista ordenada priorizando la cantidad de paradas y el promedio de rendimiento.
+        /// </summary>
+        /// <param name="combinationsResult">Resultado de combinaciones</param>
         private List<OptimalStrategyDTO> MapCombinations(List<List<TireDTO>> combinationsResult)
         {
             List<OptimalStrategyDTO> optimalStrategyCollection = new List<OptimalStrategyDTO>();
