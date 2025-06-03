@@ -8,6 +8,16 @@ using RaceStrategy.Infrastructure.Persistence.Adapters;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAngularLocalhost", policy =>
+    {
+        policy.WithOrigins("http://localhost:4200")
+              .AllowAnyHeader()
+              .AllowAnyMethod();
+    });
+});
+
 // Add services to the container.
 
 builder.Services.AddControllers();
@@ -26,6 +36,8 @@ builder.Services.AddScoped<ITireService, TireService>();
 builder.Services.AddScoped<IStrategyService, StrategyService>();
 
 var app = builder.Build();
+
+app.UseCors("AllowAngularLocalhost");
 
 app.UseMiddleware<ApiKeyMiddleware>();
 
